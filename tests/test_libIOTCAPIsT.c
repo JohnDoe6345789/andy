@@ -4,6 +4,8 @@
 
 int64_t IOTC_Session_Read(int64_t sid, void *buf, int64_t size, int64_t timeout, int32_t flags);
 int64_t IOTC_sCHL_shutdown(int64_t ssl);
+uint32_t IOTC_Data_ntoh(uint32_t data);
+uint32_t IOTC_Data_hton(uint32_t data);
 
 /* Globals used to simulate stack guard */
 void *__stack_chk_guard = (void*)0x1;
@@ -129,6 +131,33 @@ static void test_shutdown_existing_error(void)
     assert(bio[22] == 1);
 }
 
+/* Tests for IOTC_Data_ntoh and IOTC_Data_hton */
+static void test_data_ntoh_known_value(void)
+{
+    uint32_t net = 0x01020304u;
+    uint32_t host = IOTC_Data_ntoh(net);
+    uint32_t expected = 0x01020304u;
+    if (*(uint8_t *)&expected == 0x04)
+        expected = 0x04030201u;
+    assert(host == expected);
+}
+
+static void test_data_hton_known_value(void)
+{
+    uint32_t host = 0x01020304u;
+    uint32_t net = IOTC_Data_hton(host);
+    uint32_t expected = 0x01020304u;
+    if (*(uint8_t *)&expected == 0x04)
+        expected = 0x04030201u;
+    assert(net == expected);
+}
+
+static void test_data_roundtrip(void)
+{
+    uint32_t val = 0xdeadbeefu;
+    assert(IOTC_Data_ntoh(IOTC_Data_hton(val)) == val);
+}
+
 int main(void)
 {
     test_read_no_guard_change();
@@ -137,6 +166,9 @@ int main(void)
     test_shutdown_no_existing();
     test_shutdown_existing_success();
     test_shutdown_existing_error();
+    test_data_ntoh_known_value();
+    test_data_hton_known_value();
+    test_data_roundtrip();
     printf("All tests executed\n");
     return 0;
 }
