@@ -4,35 +4,75 @@ on:
   pull_request:
     types: [opened, reopened, synchronize, labeled, closed]
     branches: [main]
-    paths:
-      - 'libIOTCAPIsT.c'
-      - 'tests/**'
   workflow_dispatch:
+    inputs:
+      title:
+        description: 'Title for the seed/next issue'
+        required: false
+      body:
+        description: 'Body for the seed/next issue'
+        required: false
 
 permissions:
   contents: write
   pull-requests: write
   issues: write
 
-# Still keep env for step usage (not used in job IFs)
 env:
   NEXT_TITLE: "Continuous improvement on libIOTCAPIsT.c"
   NEXT_BODY:  "Next iteration. Continuous improvement until feature parity with the .so."
   CODEX_LABEL: "codex"
 
 jobs:
+  # 1) Manual kick-off: creates the first codex issue (skip if one already open)
+  seed:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure labels and create seed issue if none open
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const label = process.env.CODEX_LABEL || 'codex';
+
+            // ensure labels exist
+            async function ensure(name, color) {
+              try { await github.rest.issues.getLabel({ owner, repo, name }); }
+              catch { try { await github.rest.issues.createLabel({ owner, repo, name, color }); } catch {} }
+            }
+            await ensure(label, '0E8A16');
+
+            // if an open codex issue already exists, do nothing
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner, repo, labels: label, state: 'open', per_page: 1
+            });
+            if (existing.length) {
+              core.notice(`Open ${label} issue already exists: #${existing[0].number}`);
+              return;
+            }
+
+            const title = core.getInput('title') || process.env.NEXT_TITLE;
+            const body  = core.getInput('body')  || process.env.NEXT_BODY;
+            const { data: issue } = await github.rest.issues.create({
+              owner, repo, title, body, labels: [label]
+            });
+            core.notice(`Created seed issue #${issue.number}`);
+
+  # 2) Test codex PRs
   test:
-    # Don’t use env in the IF; compare to the literal label
-    if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'codex')
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'codex')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Run tests
         run: make test
 
+  # 3) Merge when tests pass
   merge:
     needs: test
-    if: github.event.action != 'closed' && success()
+    if: github.event_name == 'pull_request' && github.event.action != 'closed' && success()
     runs-on: ubuntu-latest
     steps:
       - name: Merge PR (squash)
@@ -42,28 +82,21 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const pull_number = context.payload.pull_request.number;
-            await github.rest.pulls.merge({
-              owner, repo, pull_number,
-              merge_method: 'squash'
-            });
+            await github.rest.pulls.merge({ owner, repo, pull_number, merge_method: 'squash' });
 
+  # 4) After merge, archive old issue and create the next one
   postmerge:
-    name: Archive source issue & open next
-    if: github.event.action == 'closed' && github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'codex')
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'codex')
     runs-on: ubuntu-latest
     steps:
-      - name: Ensure labels exist
+      - name: Ensure 'archived' label
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            const ensure = async (name, color) => {
-              try { await github.rest.issues.getLabel({ owner, repo, name }); }
-              catch { try { await github.rest.issues.createLabel({ owner, repo, name, color }); } catch {} }
-            };
-            await ensure(process.env.CODEX_LABEL || 'codex', '0E8A16');
-            await ensure('archived', '808080');
+            try { await github.rest.issues.getLabel({ owner, repo, name: 'archived' }); }
+            catch { try { await github.rest.issues.createLabel({ owner, repo, name: 'archived', color: '808080' }); } catch {} }
 
       - name: Close & label the linked issue (from "Closes #123")
         id: archive
@@ -88,5 +121,5 @@ jobs:
             const { owner, repo } = context.repo;
             const title = process.env.NEXT_TITLE || 'Continuous improvement on libIOTCAPIsT.c';
             const body  = process.env.NEXT_BODY  || 'Next iteration. Continuous improvement until feature parity with the .so.';
-            const labels = [process.env.CODEX_LABEL || 'codex'];
-            await github.rest.issues.create({ owner, repo, title, body, labels });
+            const label = process.env.CODEX_LABEL || 'codex';
+            await github.rest.issues.create({ owner, repo, title, body, labels: [label] });
