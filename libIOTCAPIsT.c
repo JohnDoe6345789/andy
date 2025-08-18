@@ -240,3 +240,24 @@ int64_t IOTC_Session_Channel_Check_ON_OFF(int64_t sid, int32_t chID)
     return (entry->chan_mask & (1u << chID)) ? 1 : 0;
 }
 
+int64_t IOTC_Session_Close(int64_t sid)
+{
+    SessionEntry *entry = find_session(sid, 0);
+    if (!entry)
+        return -1;
+    entry->sid = 0;
+    entry->chan_mask = 0;
+    return 0;
+}
+
+int32_t IOTC_Session_Get_Free_Channel(int64_t sid)
+{
+    SessionEntry *entry = find_session(sid, 1);
+    if (!entry)
+        return -1;
+    for (int32_t i = 0; i < 32; ++i)
+        if (!(entry->chan_mask & (1u << i)))
+            return i;
+    return -1;
+}
+

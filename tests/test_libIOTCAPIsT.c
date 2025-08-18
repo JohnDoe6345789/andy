@@ -155,6 +155,29 @@ static void test_channel_isolated_sessions(void)
     IOTC_Session_Channel_OFF(sid2, ch);
 }
 
+static void test_session_close(void)
+{
+    int64_t sid = 77;
+    int32_t ch = 2;
+    IOTC_Session_Channel_ON(sid, ch);
+    assert(IOTC_Session_Channel_Check_ON_OFF(sid, ch) == 1);
+    assert(IOTC_Session_Close(sid) == 0);
+    assert(IOTC_Session_Channel_Check_ON_OFF(sid, ch) == 0);
+    assert(IOTC_Session_Close(sid) == -1);
+}
+
+static void test_session_get_free_channel(void)
+{
+    int64_t sid = 123;
+    assert(IOTC_Session_Get_Free_Channel(sid) == 0);
+    IOTC_Session_Channel_ON(sid, 0);
+    assert(IOTC_Session_Get_Free_Channel(sid) == 1);
+    for (int i = 1; i < 32; ++i)
+        IOTC_Session_Channel_ON(sid, i);
+    assert(IOTC_Session_Get_Free_Channel(sid) == -1);
+    IOTC_Session_Close(sid);
+}
+
 /* Tests for IOTC_Data_ntoh and IOTC_Data_hton */
 static void test_data_ntoh_known_value(void)
 {
@@ -234,6 +257,8 @@ int main(void)
     test_shutdown_existing_error();
     test_channel_toggle();
     test_channel_isolated_sessions();
+    test_session_close();
+    test_session_get_free_channel();
     test_data_ntoh_known_value();
     test_data_hton_known_value();
     test_data_roundtrip();
