@@ -1,11 +1,9 @@
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 
-int64_t IOTC_Session_Read(int64_t sid, void *buf, int64_t size, int64_t timeout, int32_t flags);
-int64_t IOTC_sCHL_shutdown(int64_t ssl);
-uint32_t IOTC_Data_ntoh(uint32_t data);
-uint32_t IOTC_Data_hton(uint32_t data);
+#include "libIOTCAPIsT.h"
 
 /* Globals used to simulate stack guard */
 void *__stack_chk_guard = (void*)0x1;
@@ -158,6 +156,35 @@ static void test_data_roundtrip(void)
     assert(IOTC_Data_ntoh(IOTC_Data_hton(val)) == val);
 }
 
+/* Tests for IOTC_Header_ntoh and IOTC_Header_hton */
+static void test_header_ntoh_known_values(void)
+{
+    IOTCHeader hdr = {0x01020304u, 0x05060708u, 0x090a0b0cu,
+                      0x0d0e0f10u, 0x11121314u};
+    IOTC_Header_ntoh(&hdr);
+    IOTCHeader expected = {0x01020304u, 0x05060708u, 0x090a0b0cu,
+                           0x0d0e0f10u, 0x11121314u};
+    if (*(uint8_t *)&expected.flag == 0x04)
+    {
+        expected.flag = 0x04030201u;
+        expected.sid = 0x08070605u;
+        expected.seq = 0x0c0b0a09u;
+        expected.timestamp = 0x100f0e0du;
+        expected.payload = 0x14131211u;
+    }
+    assert(memcmp(&hdr, &expected, sizeof hdr) == 0);
+}
+
+static void test_header_hton_roundtrip(void)
+{
+    IOTCHeader host = {0x11223344u, 0x55667788u, 0x99aabbccu,
+                       0xddeeff00u, 0x12345678u};
+    IOTCHeader net = host;
+    IOTC_Header_hton(&net);
+    IOTC_Header_ntoh(&net);
+    assert(memcmp(&host, &net, sizeof host) == 0);
+}
+
 int main(void)
 {
     test_read_no_guard_change();
@@ -169,6 +196,8 @@ int main(void)
     test_data_ntoh_known_value();
     test_data_hton_known_value();
     test_data_roundtrip();
+    test_header_ntoh_known_values();
+    test_header_hton_roundtrip();
     printf("All tests executed\n");
     return 0;
 }
