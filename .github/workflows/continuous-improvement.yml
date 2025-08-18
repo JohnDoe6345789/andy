@@ -9,21 +9,21 @@ on:
       - 'tests/**'
   workflow_dispatch:
 
-# Give the workflow token the rights it needs
 permissions:
   contents: write
   pull-requests: write
   issues: write
 
+# Still keep env for step usage (not used in job IFs)
 env:
-  # Customize the next issue text (optional)
   NEXT_TITLE: "Continuous improvement on libIOTCAPIsT.c"
   NEXT_BODY:  "Next iteration. Continuous improvement until feature parity with the .so."
   CODEX_LABEL: "codex"
 
 jobs:
   test:
-    if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, env.CODEX_LABEL)
+    # Don’t use env in the IF; compare to the literal label
+    if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, 'codex')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -42,7 +42,6 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const pull_number = context.payload.pull_request.number;
-            // Try to merge (succeeds if branch protections allow)
             await github.rest.pulls.merge({
               owner, repo, pull_number,
               merge_method: 'squash'
@@ -50,8 +49,7 @@ jobs:
 
   postmerge:
     name: Archive source issue & open next
-    # Runs only when the PR is closed AND merged and has the 'codex' label
-    if: github.event.action == 'closed' && github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, env.CODEX_LABEL)
+    if: github.event.action == 'closed' && github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'codex')
     runs-on: ubuntu-latest
     steps:
       - name: Ensure labels exist
@@ -62,12 +60,10 @@ jobs:
             const { owner, repo } = context.repo;
             const ensure = async (name, color) => {
               try { await github.rest.issues.getLabel({ owner, repo, name }); }
-              catch {
-                try { await github.rest.issues.createLabel({ owner, repo, name, color }); } catch {}
-              }
+              catch { try { await github.rest.issues.createLabel({ owner, repo, name, color }); } catch {} }
             };
-            await ensure(process.env.CODEX_LABEL, '0E8A16'); // green-ish
-            await ensure('archived', '808080');              // gray
+            await ensure(process.env.CODEX_LABEL || 'codex', '0E8A16');
+            await ensure('archived', '808080');
 
       - name: Close & label the linked issue (from "Closes #123")
         id: archive
@@ -77,13 +73,10 @@ jobs:
           script: |
             const { owner, repo } = context.repo;
             const body = context.payload.pull_request.body || '';
-            // Find "Closes #123" / "Fixes #123" / "Resolves #123" / plain "#123"
             const m = body.match(/(?:(?:close[sd]?|fixe?[sd]?|resolve[sd]?)\s+#(\d+))|#(\d+)/i);
             const num = m ? (m[1] || m[2]) : null;
             core.setOutput('issue', num || '');
             if (!num) return;
-
-            // Add 'archived' label and close the issue
             await github.rest.issues.addLabels({ owner, repo, issue_number: Number(num), labels: ['archived'] });
             await github.rest.issues.update({ owner, repo, issue_number: Number(num), state: 'closed' });
 
