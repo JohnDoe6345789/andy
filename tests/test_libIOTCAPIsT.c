@@ -178,6 +178,20 @@ static void test_session_get_free_channel(void)
     IOTC_Session_Close(sid);
 }
 
+static void test_get_session_id_and_max_number(void)
+{
+    /* shrink table to 2 entries for testing */
+    assert(IOTC_Set_Max_Session_Number(2) == 2);
+    int64_t s1 = IOTC_Get_SessionID();
+    int64_t s2 = IOTC_Get_SessionID();
+    assert(s1 > 0 && s2 > 0 && s1 != s2);
+    assert(IOTC_Get_SessionID() == -1); /* table full */
+    IOTC_Session_Close(s1);
+    assert(IOTC_Get_SessionID() > 0); /* reuse freed slot */
+    /* expand table back to default */
+    assert(IOTC_Set_Max_Session_Number(8) == 8);
+}
+
 /* Tests for IOTC_Data_ntoh and IOTC_Data_hton */
 static void test_data_ntoh_known_value(void)
 {
@@ -259,6 +273,7 @@ int main(void)
     test_channel_isolated_sessions();
     test_session_close();
     test_session_get_free_channel();
+    test_get_session_id_and_max_number();
     test_data_ntoh_known_value();
     test_data_hton_known_value();
     test_data_roundtrip();

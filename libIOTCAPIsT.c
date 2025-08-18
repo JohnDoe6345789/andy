@@ -10,6 +10,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdlib.h>
 #include <string.h>
 #include "libIOTCAPIsT.h"
 
@@ -169,26 +170,40 @@ const char *IOTC_Get_Version_String(void)
  * session can enable up to 32 channels which we track using a bit mask.
  */
 
-#define MAX_TRACKED_SESSIONS 8
-
 typedef struct {
     int64_t sid;         /* session identifier */
     uint32_t chan_mask;  /* bit mask of enabled channels */
 } SessionEntry;
 
-static SessionEntry session_table[MAX_TRACKED_SESSIONS];
+/*
+ * The real library allows the maximum number of concurrent sessions to be
+ * configured via IOTC_Set_Max_Session_Number.  To emulate this behaviour the
+ * test implementation allocates the session table dynamically and resizes it
+ * on demand.
+ */
+static SessionEntry *session_table;      /* dynamically sized array */
+static unsigned int max_sessions = 8;    /* default capacity */
+
+/* Ensure the session table has been allocated before use. */
+static void ensure_session_table(void)
+{
+    if (!session_table)
+        session_table = calloc(max_sessions, sizeof(SessionEntry));
+}
 
 /* Locate the table entry for a session, optionally creating a new one. */
 static SessionEntry *find_session(int64_t sid, int create)
 {
-    for (size_t i = 0; i < MAX_TRACKED_SESSIONS; ++i)
+    ensure_session_table();
+
+    for (size_t i = 0; i < max_sessions; ++i)
         if (session_table[i].sid == sid)
             return &session_table[i];
 
     if (!create)
         return NULL;
 
-    for (size_t i = 0; i < MAX_TRACKED_SESSIONS; ++i)
+    for (size_t i = 0; i < max_sessions; ++i)
         if (session_table[i].sid == 0)
         {
             session_table[i].sid = sid;
@@ -197,6 +212,58 @@ static SessionEntry *find_session(int64_t sid, int create)
         }
 
     return NULL; /* no space left */
+}
+
+/* --------------------------------------------------------------------- */
+/* Session allocation helpers                                            */
+
+/* Obtain a tutk_platform_free session identifier.  The simple model uses an
+ * incrementing counter and reserves a slot in the session table for the
+ * caller.  When the table is full -1 is returned. */
+int64_t IOTC_Get_SessionID(void)
+{
+    static int64_t next_sid = 1;
+
+    ensure_session_table();
+
+    for (unsigned int attempt = 0; attempt < max_sessions; ++attempt)
+    {
+        int64_t sid = next_sid++;
+        if (next_sid <= 0)
+            next_sid = 1;
+
+        if (!find_session(sid, 0))
+        {
+            if (find_session(sid, 1))
+                return sid;
+        }
+    }
+
+    return -1; /* table full */
+}
+
+/* Set the maximum number of sessions tracked by the in-memory model.  Existing
+ * session information is preserved up to the new limit. */
+int64_t IOTC_Set_Max_Session_Number(unsigned int n)
+{
+    if (n == 0)
+        return -1;
+
+    SessionEntry *new_table = calloc(n, sizeof(SessionEntry));
+    if (!new_table)
+        return -1;
+
+    if (session_table)
+    {
+        unsigned int copy = (n < max_sessions) ? n : max_sessions;
+        for (unsigned int i = 0; i < copy; ++i)
+            new_table[i] = session_table[i];
+        free(session_table);
+    }
+
+    session_table = new_table;
+    max_sessions = n;
+    return (int64_t)n;
 }
 
 int64_t IOTC_Session_Channel_ON(int64_t sid, int32_t chID)

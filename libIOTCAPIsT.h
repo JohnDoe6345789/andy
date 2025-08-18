@@ -31,5 +31,7 @@ int64_t IOTC_Session_Channel_OFF(int64_t sid, int32_t chID);
 int64_t IOTC_Session_Channel_Check_ON_OFF(int64_t sid, int32_t chID);
 int64_t IOTC_Session_Close(int64_t sid);
 int32_t IOTC_Session_Get_Free_Channel(int64_t sid);
+int64_t IOTC_Get_SessionID(void);
+int64_t IOTC_Set_Max_Session_Number(unsigned int n);
 
 #endif /* LIBIOTCAPIST_H */
