@@ -2,33 +2,98 @@ name: Continuous Improvement
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, labeled, closed]
     branches: [main]
     paths:
       - 'libIOTCAPIsT.c'
       - 'tests/**'
   workflow_dispatch:
 
+# Give the workflow token the rights it needs
 permissions:
   contents: write
   pull-requests: write
+  issues: write
+
+env:
+  # Customize the next issue text (optional)
+  NEXT_TITLE: "Continuous improvement on libIOTCAPIsT.c"
+  NEXT_BODY:  "Next iteration. Continuous improvement until feature parity with the .so."
+  CODEX_LABEL: "codex"
 
 jobs:
   test:
+    if: github.event.action != 'closed' && contains(github.event.pull_request.labels.*.name, env.CODEX_LABEL)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Run tests
         run: make test
 
   merge:
     needs: test
-    if: github.event_name == 'pull_request' && success()
+    if: github.event.action != 'closed' && success()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/github-script@v6
+      - name: Merge PR (squash)
+        uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const {owner, repo} = context.repo;
+            const { owner, repo } = context.repo;
             const pull_number = context.payload.pull_request.number;
-            await github.rest.pulls.merge({owner, repo, pull_number});
+            // Try to merge (succeeds if branch protections allow)
+            await github.rest.pulls.merge({
+              owner, repo, pull_number,
+              merge_method: 'squash'
+            });
+
+  postmerge:
+    name: Archive source issue & open next
+    # Runs only when the PR is closed AND merged and has the 'codex' label
+    if: github.event.action == 'closed' && github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, env.CODEX_LABEL)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ensure labels exist
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const ensure = async (name, color) => {
+              try { await github.rest.issues.getLabel({ owner, repo, name }); }
+              catch {
+                try { await github.rest.issues.createLabel({ owner, repo, name, color }); } catch {}
+              }
+            };
+            await ensure(process.env.CODEX_LABEL, '0E8A16'); // green-ish
+            await ensure('archived', '808080');              // gray
+
+      - name: Close & label the linked issue (from "Closes #123")
+        id: archive
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const body = context.payload.pull_request.body || '';
+            // Find "Closes #123" / "Fixes #123" / "Resolves #123" / plain "#123"
+            const m = body.match(/(?:(?:close[sd]?|fixe?[sd]?|resolve[sd]?)\s+#(\d+))|#(\d+)/i);
+            const num = m ? (m[1] || m[2]) : null;
+            core.setOutput('issue', num || '');
+            if (!num) return;
+
+            // Add 'archived' label and close the issue
+            await github.rest.issues.addLabels({ owner, repo, issue_number: Number(num), labels: ['archived'] });
+            await github.rest.issues.update({ owner, repo, issue_number: Number(num), state: 'closed' });
+
+      - name: Create next Codex issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const title = process.env.NEXT_TITLE || 'Continuous improvement on libIOTCAPIsT.c';
+            const body  = process.env.NEXT_BODY  || 'Next iteration. Continuous improvement until feature parity with the .so.';
+            const labels = [process.env.CODEX_LABEL || 'codex'];
+            await github.rest.issues.create({ owner, repo, title, body, labels });
