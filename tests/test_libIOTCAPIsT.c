@@ -129,6 +129,32 @@ static void test_shutdown_existing_error(void)
     assert(bio[22] == 1);
 }
 
+/* Tests for session channel helpers */
+static void test_channel_toggle(void)
+{
+    int64_t sid = 42;
+    int32_t ch = 3;
+    assert(IOTC_Session_Channel_Check_ON_OFF(sid, ch) == 0);
+    assert(IOTC_Session_Channel_ON(sid, ch) == 0);
+    assert(IOTC_Session_Channel_Check_ON_OFF(sid, ch) == 1);
+    assert(IOTC_Session_Channel_OFF(sid, ch) == 0);
+    assert(IOTC_Session_Channel_Check_ON_OFF(sid, ch) == 0);
+}
+
+static void test_channel_isolated_sessions(void)
+{
+    int64_t sid1 = 1, sid2 = 2;
+    int32_t ch = 1;
+    IOTC_Session_Channel_ON(sid1, ch);
+    IOTC_Session_Channel_ON(sid2, ch);
+    assert(IOTC_Session_Channel_Check_ON_OFF(sid1, ch) == 1);
+    assert(IOTC_Session_Channel_Check_ON_OFF(sid2, ch) == 1);
+    IOTC_Session_Channel_OFF(sid1, ch);
+    assert(IOTC_Session_Channel_Check_ON_OFF(sid1, ch) == 0);
+    assert(IOTC_Session_Channel_Check_ON_OFF(sid2, ch) == 1);
+    IOTC_Session_Channel_OFF(sid2, ch);
+}
+
 /* Tests for IOTC_Data_ntoh and IOTC_Data_hton */
 static void test_data_ntoh_known_value(void)
 {
@@ -206,6 +232,8 @@ int main(void)
     test_shutdown_no_existing();
     test_shutdown_existing_success();
     test_shutdown_existing_error();
+    test_channel_toggle();
+    test_channel_isolated_sessions();
     test_data_ntoh_known_value();
     test_data_hton_known_value();
     test_data_roundtrip();
