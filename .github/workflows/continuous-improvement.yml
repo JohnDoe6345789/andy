@@ -1,0 +1,34 @@
+name: Continuous Improvement
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'libIOTCAPIsT.c'
+      - 'tests/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run tests
+        run: make test
+
+  merge:
+    needs: test
+    if: github.event_name == 'pull_request' && success()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const {owner, repo} = context.repo;
+            const pull_number = context.payload.pull_request.number;
+            await github.rest.pulls.merge({owner, repo, pull_number});
