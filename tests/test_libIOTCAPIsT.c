@@ -185,6 +185,19 @@ static void test_header_hton_roundtrip(void)
     assert(memcmp(&host, &net, sizeof host) == 0);
 }
 
+static void test_get_version(void)
+{
+    uint32_t ver = 0;
+    IOTC_Get_Version(&ver);
+    assert(ver == 0x010d0700u);
+}
+
+static void test_get_version_string(void)
+{
+    const char *s = IOTC_Get_Version_String();
+    assert(strcmp(s, "1.13.7.0") == 0);
+}
+
 int main(void)
 {
     test_read_no_guard_change();
@@ -198,6 +211,8 @@ int main(void)
     test_data_roundtrip();
     test_header_ntoh_known_values();
     test_header_hton_roundtrip();
+    test_get_version();
+    test_get_version_string();
     printf("All tests executed\n");
     return 0;
 }

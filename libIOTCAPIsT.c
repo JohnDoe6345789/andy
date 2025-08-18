@@ -139,3 +139,21 @@ void IOTC_Header_hton(IOTCHeader *hdr)
     hdr->payload   = IOTC_Data_hton(hdr->payload);
 }
 
+/*
+ * Retrieve the version of the IOTC library.  The shared object exposes
+ * a function that writes a 32-bit packed version number into the caller's
+ * provided pointer.  Reverse engineering shows the value 0x010d0700 which
+ * corresponds to version 1.13.7.0.
+ */
+void IOTC_Get_Version(uint32_t *pnVersion)
+{
+    if (pnVersion)
+        *pnVersion = 0x010d0700u;
+}
+
+/* Return the version string matching IOTC_Get_Version. */
+const char *IOTC_Get_Version_String(void)
+{
+    return "1.13.7.0";
+}
+
