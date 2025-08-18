@@ -9,6 +9,7 @@
  */
 
 #include <stdint.h>
+#include "libIOTCAPIsT.h"
 
 /*
  * When GCC emits stack protector code it references the variables below.  They
@@ -53,6 +54,9 @@ int64_t IOTC_Session_Read(int64_t sid, void *buf, int64_t size,
     /* Guard value changed – trigger the failure handler. */
     __stack_chk_fail();
     /* no return */
+#if defined(__GNUC__)
+    __builtin_unreachable();
+#endif
 }
 
 int64_t IOTC_sCHL_shutdown(int64_t ssl)
@@ -109,5 +113,29 @@ uint32_t IOTC_Data_hton(uint32_t data)
 #else
     return data;
 #endif
+}
+
+/*
+ * Convert the fields of an IOTC header structure between host and
+ * network byte order.  The exact semantics of the fields are not
+ * important here; the helper simply swaps each 32-bit value.
+ */
+
+void IOTC_Header_ntoh(IOTCHeader *hdr)
+{
+    hdr->flag      = IOTC_Data_ntoh(hdr->flag);
+    hdr->sid       = IOTC_Data_ntoh(hdr->sid);
+    hdr->seq       = IOTC_Data_ntoh(hdr->seq);
+    hdr->timestamp = IOTC_Data_ntoh(hdr->timestamp);
+    hdr->payload   = IOTC_Data_ntoh(hdr->payload);
+}
+
+void IOTC_Header_hton(IOTCHeader *hdr)
+{
+    hdr->flag      = IOTC_Data_hton(hdr->flag);
+    hdr->sid       = IOTC_Data_hton(hdr->sid);
+    hdr->seq       = IOTC_Data_hton(hdr->seq);
+    hdr->timestamp = IOTC_Data_hton(hdr->timestamp);
+    hdr->payload   = IOTC_Data_hton(hdr->payload);
 }
 
