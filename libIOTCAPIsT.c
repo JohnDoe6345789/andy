@@ -77,3 +77,37 @@ int64_t IOTC_sCHL_shutdown(int64_t ssl)
                  "IOTC_sCHL_shutdown", bio[0], bio[1], ret);
     return translate_Error(ret, ssl);
 }
+
+/*
+ * Data endianness helpers.  The original shared library exposes two utility
+ * functions that convert 32-bit integers between host and network byte order.
+ * Reimplement them here using purely standard C so that unit tests do not
+ * depend on platform specific headers such as <arpa/inet.h>.
+ */
+
+static inline uint32_t bswap32(uint32_t v)
+{
+    return ((v & 0x000000FFu) << 24) |
+           ((v & 0x0000FF00u) << 8)  |
+           ((v & 0x00FF0000u) >> 8)  |
+           ((v & 0xFF000000u) >> 24);
+}
+
+uint32_t IOTC_Data_ntoh(uint32_t data)
+{
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return bswap32(data);
+#else
+    return data;
+#endif
+}
+
+uint32_t IOTC_Data_hton(uint32_t data)
+{
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+    return bswap32(data);
+#else
+    return data;
+#endif
+}
+
