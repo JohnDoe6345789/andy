@@ -9,6 +9,8 @@
  */
 
 #include <stdint.h>
+#include <stddef.h>
+#include <string.h>
 #include "libIOTCAPIsT.h"
 
 /*
@@ -155,5 +157,86 @@ void IOTC_Get_Version(uint32_t *pnVersion)
 const char *IOTC_Get_Version_String(void)
 {
     return "1.13.7.0";
+}
+
+/* ------------------------------------------------------------------------- */
+/* Session channel management                                                 */
+
+/*
+ * The original library exposes helpers that toggle logical channels within a
+ * session.  The real implementation likely interacts with the networking
+ * stack but for testing purposes a very small in-memory model suffices.  Each
+ * session can enable up to 32 channels which we track using a bit mask.
+ */
+
+#define MAX_TRACKED_SESSIONS 8
+
+typedef struct {
+    int64_t sid;         /* session identifier */
+    uint32_t chan_mask;  /* bit mask of enabled channels */
+} SessionEntry;
+
+static SessionEntry session_table[MAX_TRACKED_SESSIONS];
+
+/* Locate the table entry for a session, optionally creating a new one. */
+static SessionEntry *find_session(int64_t sid, int create)
+{
+    for (size_t i = 0; i < MAX_TRACKED_SESSIONS; ++i)
+        if (session_table[i].sid == sid)
+            return &session_table[i];
+
+    if (!create)
+        return NULL;
+
+    for (size_t i = 0; i < MAX_TRACKED_SESSIONS; ++i)
+        if (session_table[i].sid == 0)
+        {
+            session_table[i].sid = sid;
+            session_table[i].chan_mask = 0;
+            return &session_table[i];
+        }
+
+    return NULL; /* no space left */
+}
+
+int64_t IOTC_Session_Channel_ON(int64_t sid, int32_t chID)
+{
+    if (chID < 0 || chID >= 32)
+        return -1;
+
+    SessionEntry *entry = find_session(sid, 1);
+    if (!entry)
+        return -1;
+
+    entry->chan_mask |= (1u << chID);
+    return 0;
+}
+
+int64_t IOTC_Session_Channel_OFF(int64_t sid, int32_t chID)
+{
+    if (chID < 0 || chID >= 32)
+        return -1;
+
+    SessionEntry *entry = find_session(sid, 0);
+    if (!entry)
+        return -1;
+
+    entry->chan_mask &= ~(1u << chID);
+    if (entry->chan_mask == 0)
+        entry->sid = 0;
+
+    return 0;
+}
+
+int64_t IOTC_Session_Channel_Check_ON_OFF(int64_t sid, int32_t chID)
+{
+    if (chID < 0 || chID >= 32)
+        return 0;
+
+    SessionEntry *entry = find_session(sid, 0);
+    if (!entry)
+        return 0;
+
+    return (entry->chan_mask & (1u << chID)) ? 1 : 0;
 }
 

@@ -26,4 +26,8 @@ void IOTC_Header_hton(IOTCHeader *hdr);
 void IOTC_Get_Version(uint32_t *pnVersion);
 const char *IOTC_Get_Version_String(void);
 
+int64_t IOTC_Session_Channel_ON(int64_t sid, int32_t chID);
+int64_t IOTC_Session_Channel_OFF(int64_t sid, int32_t chID);
+int64_t IOTC_Session_Channel_Check_ON_OFF(int64_t sid, int32_t chID);
+
 #endif /* LIBIOTCAPIST_H */
