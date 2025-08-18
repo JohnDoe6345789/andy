@@ -328,3 +328,170 @@ int32_t IOTC_Session_Get_Free_Channel(int64_t sid)
     return -1;
 }
 
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Listen, IOTC_Connect, IOTC_Session_Get_Info      */
+/* These are stubs for compatibility with the .so, returning error codes */
+/* or dummy values as appropriate.                                       */
+
+int64_t IOTC_Listen(const char *uid, uint16_t port, uint32_t timeout_ms)
+{
+    (void)uid; (void)port; (void)timeout_ms;
+    return -1; /* not implemented */
+}
+
+int64_t IOTC_Connect(const char *uid, const char *server, uint16_t port)
+{
+    (void)uid; (void)server; (void)port;
+    return -1; /* not implemented */
+}
+
+int64_t IOTC_Session_Get_Info(int64_t sid, void *info)
+{
+    (void)sid; (void)info;
+    return -1; /* not implemented */
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Initialize, IOTC_DeInitialize                    */
+
+int64_t IOTC_Initialize(void)
+{
+    /* No-op for test implementation */
+    return 0;
+}
+
+int64_t IOTC_DeInitialize(void)
+{
+    /* Free session table if allocated */
+    if (session_table) {
+        free(session_table);
+        session_table = NULL;
+    }
+    max_sessions = 8;
+    return 0;
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Get_Login_Info, IOTC_Get_Session_Status          */
+
+int64_t IOTC_Get_Login_Info(int64_t sid, void *login_info)
+{
+    (void)sid; (void)login_info;
+    return -1; /* not implemented */
+}
+
+int64_t IOTC_Get_Session_Status(int64_t sid)
+{
+    (void)sid;
+    return -1; /* not implemented */
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Check                                    */
+
+int64_t IOTC_Session_Check(int64_t sid)
+{
+    /* Return 1 if session exists, 0 otherwise */
+    SessionEntry *entry = find_session(sid, 0);
+    return entry ? 1 : 0;
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Get_Channel_ON_Count                     */
+
+int32_t IOTC_Session_Get_Channel_ON_Count(int64_t sid)
+{
+    SessionEntry *entry = find_session(sid, 0);
+    if (!entry)
+        return 0;
+    uint32_t mask = entry->chan_mask;
+    int count = 0;
+    for (int i = 0; i < 32; ++i)
+        if (mask & (1u << i))
+            ++count;
+    return count;
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Get_My_SessionID                         */
+
+int64_t IOTC_Session_Get_My_SessionID(void)
+{
+    /* Not meaningful in test context, return -1 */
+    return -1;
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Get_Remote_Info                          */
+
+int64_t IOTC_Session_Get_Remote_Info(int64_t sid, void *remote_info)
+{
+    (void)sid; (void)remote_info;
+    return -1; /* not implemented */
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Get_Timeout                              */
+
+int64_t IOTC_Session_Get_Timeout(int64_t sid)
+{
+    (void)sid;
+    return -1; /* not implemented */
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Set_Timeout                              */
+
+int64_t IOTC_Session_Set_Timeout(int64_t sid, uint32_t timeout)
+{
+    (void)sid; (void)timeout;
+    return -1; /* not implemented */
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Check_Alive                              */
+
+int64_t IOTC_Session_Check_Alive(int64_t sid)
+{
+    /* Return 1 if session exists, 0 otherwise */
+    SessionEntry *entry = find_session(sid, 0);
+    return entry ? 1 : 0;
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_GetBufSize                               */
+
+int64_t IOTC_Session_GetBufSize(int64_t sid)
+{
+    (void)sid;
+    return -1; /* not implemented */
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Get_ConnType                             */
+
+int64_t IOTC_Session_Get_ConnType(int64_t sid)
+{
+    (void)sid;
+    return -1; /* not implemented */
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Get_Info_Ex                              */
+
+int64_t IOTC_Session_Get_Info_Ex(int64_t sid, void *info_ex)
+{
+    (void)sid; (void)info_ex;
+    return -1; /* not implemented */
+}
+
+/* --------------------------------------------------------------------- */
+/* Feature parity: IOTC_Session_Get_Channel_ON_Bitmap                    */
+
+uint32_t IOTC_Session_Get_Channel_ON_Bitmap(int64_t sid)
+{
+    SessionEntry *entry = find_session(sid, 0);
+    if (!entry)
+        return 0;
+    return entry->chan_mask;
+}
